@@ -120,6 +120,8 @@ rules:
               - { contains: "qnap", set: "QNAP" }
               - { contains: "cisco", set: "Cisco" }
               - { contains_any: ["fortinet", "fortigate"], set: "Fortinet" }
+              - { contains: "openwrt", set: "OpenWrt" }
+              - { contains_any: ["gl-inet", "glinet"], set: "GL.iNet" }
 
   # ── PrometheusClassifier (kind="metric", ordered first-match) ──────────
   # node_exporter is checked FIRST (high-value). Mirrors the original switch
