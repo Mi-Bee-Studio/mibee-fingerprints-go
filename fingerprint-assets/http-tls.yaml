@@ -161,3 +161,129 @@ rules:
       metadata:
         metrics_url: { passthrough: url }
         content_kind: { const: "prometheus" }
+
+  # ── HTTP Server-header product rules (kind="http", field="server") ──────
+  # These match the Server header on structured HTTP evidence and emit product
+  # metadata. They complement the Recog http_header.server rules (which match
+  # the banner field) by running on the structured http evidence path. Each
+  # uses exclusive_group "http-product" so only the first match per evidence
+  # piece carries product metadata.
+
+  - id: http-server-llamacpp
+    source: builtin
+    priority: 20
+    exclusive_group: http-product
+    match:
+      kind: http
+      field: server
+      op: contains
+      value: "llama.cpp"
+      ci: true
+    service: http
+    protocol: tcp
+    confidence: 0.85
+    extract:
+      metadata:
+        product: { const: "llama.cpp" }
+        inferred_brand: { const: "llama.cpp" }
+
+  - id: http-server-openwrt
+    source: builtin
+    priority: 20
+    exclusive_group: http-product
+    match:
+      kind: http
+      field: server
+      op: contains
+      value: "uhttpd"
+      ci: true
+    service: http
+    protocol: tcp
+    confidence: 0.85
+    extract:
+      metadata:
+        product: { const: "OpenWrt uHTTPd" }
+        inferred_brand: { const: "OpenWrt" }
+
+  - id: http-server-mibee
+    source: builtin
+    priority: 20
+    exclusive_group: http-product
+    match:
+      kind: http
+      field: title
+      op: contains
+      value: "MiBee Steward"
+      ci: true
+    service: http
+    protocol: tcp
+    confidence: 0.85
+    extract:
+      metadata:
+        product: { const: "MiBee Steward" }
+        inferred_brand: { const: "MiBee" }
+
+  - id: http-server-dropbear
+    source: builtin
+    priority: 20
+    exclusive_group: http-product
+    match:
+      kind: http
+      field: server
+      op: contains
+      value: "Dropbear"
+      ci: true
+    service: http
+    protocol: tcp
+    confidence: 0.85
+    extract:
+      metadata:
+        product: { const: "Dropbear" }
+
+  # Apache httpd version: "Apache/2.4.58" → version "2.4.58"
+  - id: http-server-apache-version
+    source: builtin
+    priority: 15
+    exclusive_group: http-product
+    match:
+      kind: http
+      field: server
+      op: contains
+      value: "Apache"
+      ci: true
+    service: http
+    protocol: tcp
+    confidence: 0.85
+    extract:
+      metadata:
+        product: { const: "Apache HTTPD" }
+        inferred_brand: { const: "Apache" }
+        version:
+          substring_after:
+            field: server
+            delim: "/"
+            until: [" ", "("]
+
+  # nginx version: "nginx/1.26.1" → version "1.26.1"
+  - id: http-server-nginx-version
+    source: builtin
+    priority: 15
+    exclusive_group: http-product
+    match:
+      kind: http
+      field: server
+      op: contains
+      value: "nginx"
+      ci: true
+    service: http
+    protocol: tcp
+    confidence: 0.85
+    extract:
+      metadata:
+        product: { const: "nginx" }
+        inferred_brand: { const: "nginx" }
+        version:
+          substring_after:
+            field: server
+            delim: "/"
+            until: [" ", "("]
