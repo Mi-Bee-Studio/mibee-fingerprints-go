@@ -1,4 +1,4 @@
-module mibee-fingerprints-go
+module 192.168.63.10/home-lab/mibee-fingerprints-go
 
 go 1.26.3
 
