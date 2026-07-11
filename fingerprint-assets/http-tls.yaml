@@ -121,6 +121,7 @@ rules:
               - { contains: "cisco", set: "Cisco" }
               - { contains_any: ["fortinet", "fortigate"], set: "Fortinet" }
               - { contains: "openwrt", set: "OpenWrt" }
+              - { contains: "istoreos", set: "iStoreOS" }
               - { contains_any: ["gl-inet", "glinet"], set: "GL.iNet" }
 
   # ── PrometheusClassifier (kind="metric", ordered first-match) ──────────
