@@ -1,15 +1,15 @@
 # mibee-fingerprints-go
 
-Reference Go engine for the [MiBee fingerprint corpus](https://gitea.local/home-lab/mibee-fingerprints).
+Reference Go engine for the MiBee fingerprint corpus.
 
 Loads YAML rule files and evaluates them against `Evidence` to emit
 `ServiceIdentity` assertions. Implements the adapter spec
-([fingerprint-spec.md](https://gitea.local/home-lab/mibee-fingerprints/docs/fingerprint-spec.md)).
+([fingerprint-spec.md](https://github.com/Mi-Bee-Studio/MiBeeSteward/blob/main/docs/fingerprint-spec.md)).
 
 ## Usage
 
 ```go
-import fp "mibee-fingerprints-go"
+import fp "github.com/Mi-Bee-Studio/mibee-fingerprints-go"
 
 // Load embedded rules (compiled into the binary — zero config).
 rc := &fp.RuleClassifier{}
@@ -47,8 +47,8 @@ type ServiceIdentity struct {
 
 ## Rule format
 
-See the [data repo](https://gitea.local/home-lab/mibee-fingerprints) for the
-rule YAML files and `docs/fingerprint-spec.md` for the normative format spec.
+See the [MiBee Steward repo](https://github.com/Mi-Bee-Studio/MiBeeSteward) for
+the rule YAML files and `docs/fingerprint-spec.md` for the normative format spec.
 
 ## Testing
 

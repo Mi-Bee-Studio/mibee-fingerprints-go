@@ -1,4 +1,4 @@
-module mibee-fingerprints-go
+module github.com/Mi-Bee-Studio/mibee-fingerprints-go
 
 go 1.26.3
 
