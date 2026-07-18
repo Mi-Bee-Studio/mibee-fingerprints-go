@@ -1,3 +1,12 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//
+// Copyright (c) 2026 Mi-Bee Studio. All rights reserved.
+//
+// This file is part of mibee-fingerprints-go, distributed under the GNU Affero General
+// Public License v3.0 or later. You may use, modify, and redistribute it under
+// those terms; see LICENSE for the full text. A commercial license is available
+// for use cases the AGPL does not accommodate; see the main repository's LICENSE-COMMERCIAL.md.
+
 // Package classify — data-driven rule classifier.
 //
 // RuleClassifier loads identification rules from YAML files (see
@@ -578,7 +587,7 @@ func applyExtract(spec extractSpec, e Evidence, rlRe *regexp.Regexp, rlField, rl
 	for key, ex := range spec.Metadata {
 		if v := evalExtractor(ex, e, rlRe, rlField, rlXform); v != "" {
 			md[key] = v
-		} else if ex.WhenEquals != nil {
+		} else if ex.WhenEquals != nil { //nolint:staticcheck // SA9003: intentional empty branch — when_equals is handled in a second pass below to keep map iteration order-independent
 			// when_equals sets a flag value (may be "true" even when the field
 			// value itself is the set target); handle separately below.
 		}
