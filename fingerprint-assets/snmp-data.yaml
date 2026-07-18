@@ -1,6 +1,6 @@
 # License: CC-BY-SA 4.0 (fingerprint corpus).
 # Derivative fingerprint corpora must be released under the same license.
-# See README.md for attribution & provenance.
+# See configs/fingerprints/README.md for attribution & provenance.
 
 # SNMP data tables — the DATA part of SNMPClassifier.
 #
@@ -57,6 +57,17 @@ oid_prefixes:
   - { prefix: "1.3.6.1.4.1.11863.",      brand: TP-Link, type: router }
   - { prefix: "1.3.6.1.4.1.4526.",       brand: Netgear, type: router }
   - { prefix: "1.3.6.1.4.1.3375.",       brand: F5,      type: firewall }  # BIG-IP
+  # ── consumer / SMB networking (sysObjectID enterprise OIDs) ────────────
+  - { prefix: "1.3.6.1.4.1.711.",        brand: ASUS,    type: router }    # ASUS routers/APs
+  - { prefix: "1.3.6.1.4.1.171.",        brand: D-Link,  type: router }    # D-Link (also 6486/89119)
+  - { prefix: "1.3.6.1.4.1.6486.",       brand: D-Link,  type: switch }
+  - { prefix: "1.3.6.1.4.1.89119.",      brand: D-Link,  type: "" }
+  - { prefix: "1.3.6.1.4.1.890.",        brand: Zyxel,   type: router }    # Zyxel ZyWALL/GS1900
+  - { prefix: "1.3.6.1.4.1.11862.",      brand: Tenda,   type: router }    # Tenda routers
+  - { prefix: "1.3.6.1.4.1.17471.",      brand: DrayTek, type: router }    # DrayTek Vigor
+  - { prefix: "1.3.6.1.4.1.14988.",      brand: Mikrotik, type: "" }       # older Mikrotik subtype
+  - { prefix: "1.3.6.1.4.1.15004.",      brand: TpLink,  type: "" }        # TP-Link Omada subtype
+  - { prefix: "1.3.6.1.4.1.43590.",      brand: TpLink,  type: "" }        # TP-Link alternate
 
 # ── 2. sysDescr keyword → device type (ordered, first-match) ────────────
 # From typeFromSysDescr. Each entry: contains_any keywords → type. Lowercase
