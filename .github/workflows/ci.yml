@@ -1,0 +1,46 @@
+name: CI
+
+# Pure-Go module CI: vet + lint + test with race detector.
+# Mirrors the Go job of the main MiBee Steward repo's CI, minus the frontend /
+# sqlc / docker steps that don't apply to this library-only repository.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: go vet + lint + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.12.2
+
+      - name: go test -race
+        run: go test -race -coverprofile=cover.out -covermode=atomic ./...
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: cover.out
+          if-no-files-found: ignore
+          retention-days: 7
