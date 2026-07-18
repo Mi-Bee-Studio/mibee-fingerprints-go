@@ -59,5 +59,21 @@ go test -race ./...
 
 ## License
 
-Apache-2.0. Rule data includes Rapid7 Recog (Apache-2.0) — see the data repo's
-NOTICE/THIRD-PARTY files.
+This module is **dual-licensed by layer**, mirroring the
+[main MiBee Steward repository](https://github.com/Mi-Bee-Studio/MiBeeSteward):
+
+| Layer | License |
+|---|---|
+| Source code (`*.go`) | [GNU AGPLv3](https://www.gnu.org/licenses/agpl-3.0) (or later) |
+| Fingerprint corpus (`fingerprint-assets/*.yaml`) | [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+
+Both layers are copyleft. Derivative Go code must be released under AGPLv3
+(or later), and derivative fingerprint corpora must be released under
+CC-BY-SA 4.0. A commercial license is available for source-code use cases the
+AGPLv3 does not accommodate (closed-source derivatives, SaaS without
+open-sourcing modifications) — see the main repository's
+[LICENSE-COMMERCIAL.md](https://github.com/Mi-Bee-Studio/MiBeeSteward/blob/main/LICENSE-COMMERCIAL.md).
+
+See [LICENSE](LICENSE) for the AGPLv3 full text and [NOTICE](NOTICE) for
+third-party attributions. The corpus provenance (Rapid7 Recog Apache-2.0,
+IEEE OUI, IANA PEN, and the nmap NPSL exclusion) is documented in NOTICE.
