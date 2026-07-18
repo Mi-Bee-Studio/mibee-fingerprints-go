@@ -1,3 +1,12 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//
+// Copyright (c) 2026 Mi-Bee Studio. All rights reserved.
+//
+// This file is part of mibee-fingerprints-go, distributed under the GNU Affero General
+// Public License v3.0 or later. You may use, modify, and redistribute it under
+// those terms; see LICENSE for the full text. A commercial license is available
+// for use cases the AGPL does not accommodate; see the main repository's LICENSE-COMMERCIAL.md.
+
 package fingerprint
 
 import (
@@ -29,7 +38,7 @@ func (r *RuleClassifier) LoadEmbeddedDefaults() error {
 	if err != nil {
 		return fmt.Errorf("embed load: %w", err)
 	}
-	defer os.RemoveAll(tmp)
+	defer func() { _ = os.RemoveAll(tmp) }() // best-effort cleanup; deferred error cannot be acted on
 	// Walk the embedded tree and copy each .yaml to a temp dir, then LoadFromDir.
 	// (LoadFromDir reads from the OS filesystem; copying to a temp dir reuses it
 	// rather than duplicating the parser. This keeps one code path for loading.)

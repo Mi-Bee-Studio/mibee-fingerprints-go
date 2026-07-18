@@ -1,0 +1,42 @@
+mibee-fingerprints-go — Reference Go engine for the MiBee fingerprint corpus
+Copyright (c) 2026 Mi-Bee Studio
+
+Dual-licensed (see LICENSE):
+  * Source code (.go) — GNU AGPLv3 or later
+  * Fingerprint corpus (fingerprint-assets/*.yaml) — CC-BY-SA 4.0
+
+========================================================================
+
+== Third-party Go dependencies ==
+
+(Apache License 2.0 / MIT — compatible with AGPLv3)
+- gopkg.in/yaml.v3 v3.0.1 — YAML parsing (the only direct dependency)
+
+No GPL/AGPL-licensed third-party code is linked, so the AGPL copyleft does
+not extend beyond this module's own source.
+
+== Fingerprint corpus provenance ==
+
+The fingerprint YAML files under fingerprint-assets/ are licensed under
+CC-BY-SA 4.0. Each rule carries a `source` field for attribution:
+
+- `builtin`     — authored for MiBee (CC-BY-SA 4.0 within this corpus)
+- `recog`       — converted from Rapid7 Recog (upstream Apache-2.0;
+                  redistributed here under CC-BY-SA, which Apache-2.0 permits
+                  because CC-BY-SA is at least as restrictive for the
+                  resulting derivative work)
+- `ieee-oui`    — IEEE OUI assignment list (factual registry; cite IEEE)
+- `iana-pen`    — IANA Private Enterprise Numbers (factual registry; cite IANA)
+
+== Explicitly NOT included ==
+
+This corpus does NOT contain or derive from nmap-service-probes. The nmap
+service fingerprint database is licensed under the Nmap Public Source License
+(NPSL), which is incompatible with this module's licenses. Identification
+behaviors inspired by nmap are implemented via clean-room reference only.
+
+========================================================================
+
+This NOTICE provides attribution as required by the licenses of third-party
+components. It does not modify or override the terms of the AGPLv3 (for code)
+or CC-BY-SA 4.0 (for the corpus) under which this module is distributed.
