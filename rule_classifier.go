@@ -159,10 +159,12 @@ type compiledRule struct {
 	hostScoped  bool   // op:port — fires once per host (not per evidence), attaches idx.byPort[port]
 	port        int    // the port this host-scoped rule asserts (0 for per-evidence rules)
 	matcher     matcher
+	gate        *ruleGate // provably-required literal; skips the rule before any regex work
 	extract     extractSpec
-	matchRegex  *regexp.Regexp // compiled match regex (for regex_capture extraction), nil if not regex
-	matchField  string         // the field the regex matched (for regex_capture extraction)
-	matchXform  string         // transform applied before matching (for regex_capture to redo)
+	matchPat    string // regex source when the top-level match op is "regex" ("" otherwise)
+	matchField  string // the field the regex matched (for regex_capture extraction)
+	matchXform  string // transform applied before matching (for regex_capture to redo)
+	cache       *regexCache // shared lazy-compile cache backing regex matchers and regex_capture
 }
 
 // matcher tests one evidence piece + the host's evidence index. Returns true
@@ -174,9 +176,20 @@ type matcher func(e Evidence, idx evidenceIndex) bool
 
 // RuleClassifier is a data-driven ServiceClassifier. LoadFromDir populates it
 // from a directory of YAML files; an empty/unloaded classifier emits nothing.
+//
+// Regex rules compile lazily (see lazyregex.go + gates.go): loading validates
+// every pattern but keeps no compiled program resident; patterns are compiled
+// on demand, gated by provably-required literals, and bounded by an LRU of
+// RegexCacheSize entries (default 512). This keeps a ~2500-rule corpus at a
+// few MB of live heap instead of the ~50 MB a fully compiled rule set costs.
 type RuleClassifier struct {
 	rules []compiledRule
 	loaded bool
+	regexes *regexCache
+	// RegexCacheSize bounds resident compiled regexes. Set BEFORE LoadFromDir;
+	// <=0 selects the default (512). It exists for memory-constrained agents
+	// and tests — the default is right for nearly everyone.
+	RegexCacheSize int
 }
 
 // Service returns the nominal classifier name. Rules emit diverse service
@@ -192,6 +205,16 @@ func (r *RuleClassifier) RuleCount() int {
 		return 0
 	}
 	return len(r.rules)
+}
+
+// CompiledRegexCount returns how many regex programs are currently resident
+// (lazily compiled). After a fresh load it is 0 — the whole point of lazy
+// compilation; it grows only as real evidence passes rule gates.
+func (r *RuleClassifier) CompiledRegexCount() int {
+	if r == nil {
+		return 0
+	}
+	return r.regexes.size()
 }
 
 // Classify evaluates all rules against the host evidence set. Two evaluation
@@ -237,11 +260,18 @@ func (r *RuleClassifier) Classify(ev []Evidence) []ServiceIdentity {
 		// Track which exclusive groups already fired on this evidence piece so
 		// lower-priority siblings skip. Empty-group rules are always independent.
 		firedGroups := map[string]bool{}
+		// Derived field texts shared by rule gates for this evidence piece.
+		gateTexts := make(map[gateKey]string, 4)
 		for _, rl := range r.rules {
 			if rl.hostScoped {
 				continue
 			}
 			if rl.group != "" && firedGroups[rl.group] {
+				continue
+			}
+			// Gate: a provably-required literal is absent → the matcher is
+			// guaranteed false; skip before touching (compiling) any regex.
+			if !rl.gate.passes(e, gateTexts) {
 				continue
 			}
 			if !rl.matcher(e, idx) {
@@ -251,7 +281,11 @@ func (r *RuleClassifier) Classify(ev []Evidence) []ServiceIdentity {
 			if !rl.literal {
 				conf = fuseConfidence(e.Confidence, rl.conf)
 			}
-			md := applyExtract(rl.extract, e, rl.matchRegex, rl.matchField, rl.matchXform)
+			var mre *regexp.Regexp
+			if rl.matchPat != "" && rl.cache != nil {
+				mre, _ = rl.cache.get(rl.matchPat) // validated at load; error ⇒ treat as absent
+			}
+			md := applyExtract(rl.extract, e, mre, rl.matchField, rl.matchXform)
 			out = append(out, ServiceIdentity{
 				Service:    rl.service,
 				Port:       e.Port,
@@ -289,6 +323,9 @@ func (r *RuleClassifier) LoadFromDir(dir string) error {
 		return err
 	}
 	var loaded []compiledRule
+	// Shared lazy-compile cache for every regex in this corpus. Created up
+	// front so matchers can close over it; bounded by RegexCacheSize.
+	r.regexes = newRegexCache(r.RegexCacheSize)
 	for _, ent := range entries {
 		if ent.IsDir() || !strings.HasSuffix(ent.Name(), ".yaml") {
 			continue
@@ -306,30 +343,32 @@ func (r *RuleClassifier) LoadFromDir(dir string) error {
 			return fmt.Errorf("fingerprint %s: unsupported version %d", ent.Name(), rf.Version)
 		}
 		for _, rl := range rf.Rules {
-			m, hostScoped, port, err := compileMatch(rl.Match)
+			m, hostScoped, port, err := compileMatch(rl.Match, r.regexes)
 			if err != nil {
 				return fmt.Errorf("fingerprint %s rule %q: %w", ent.Name(), rl.ID, err)
 			}
-			// Capture the compiled regex + field for regex_capture extractors.
-			// Only regex-op rules carry this; others leave matchRegex nil.
-			var mre *regexp.Regexp
-			mfield := rl.Match.Field
-			if rl.Match.Field == "" {
-				mfield = "banner"
-			}
+			// The regex source for regex_capture extraction: only regex-op
+			// rules carry this; others leave matchPat empty. The compiled
+			// program is resolved lazily from the shared cache at fire time
+			// (previously this compiled the pattern a SECOND time at load —
+			// the matcher already had it).
+			matchPat := ""
 			if rl.Match.Op == "regex" {
 				if pat, ok := rl.Match.Value.(string); ok {
-					if re, rerr := regexp.Compile(pat); rerr == nil {
-						mre = re
-					}
+					matchPat = pat
 				}
+			}
+			mfield := rl.Match.Field
+			if mfield == "" {
+				mfield = "banner"
 			}
 			loaded = append(loaded, compiledRule{
 				id: rl.ID, service: rl.Service, protocol: rl.Protocol,
 				conf: rl.Confidence, literal: rl.LiteralConf, priority: rl.Priority,
 				group: rl.ExclusiveGroup, hostScoped: hostScoped, port: port,
-				matcher: m, extract: rl.Extract,
-				matchRegex: mre, matchField: mfield, matchXform: rl.Match.Transform,
+				matcher: m, gate: extractGate(rl.Match), extract: rl.Extract,
+				matchPat: matchPat, matchField: mfield, matchXform: rl.Match.Transform,
+				cache: r.regexes,
 			})
 		}
 	}
@@ -349,8 +388,12 @@ func (r *RuleClassifier) LoadFromDir(dir string) error {
 
 // ── matcher compilation ──────────────────────────────────────────────────
 
-func compileMatch(s matchSpec) (matcher, bool, int, error) {
-	m, hostScoped, port, err := compileMatchInner(s)
+// compileMatch builds the matcher closure tree for a match spec. Regex ops
+// are VALIDATED here (a malformed pattern fails the load, exactly as before)
+// but compiled lazily at match time through the shared cache — the compiled
+// program is intentionally dropped right after validation.
+func compileMatch(s matchSpec, cache *regexCache) (matcher, bool, int, error) {
+	m, hostScoped, port, err := compileMatchInner(s, cache)
 	if err != nil {
 		return nil, false, 0, err
 	}
@@ -372,7 +415,7 @@ func compileMatch(s matchSpec) (matcher, bool, int, error) {
 }
 
 // compileMatchInner is the raw op→matcher switch (no kind-scoping wrapper).
-func compileMatchInner(s matchSpec) (matcher, bool, int, error) {
+func compileMatchInner(s matchSpec, cache *regexCache) (matcher, bool, int, error) {
 	switch s.Op {
 	case "kind_presence":
 		kind := s.Kind
@@ -441,17 +484,26 @@ func compileMatchInner(s matchSpec) (matcher, bool, int, error) {
 		}, false, 0, nil
 	case "regex":
 		pat, _ := s.Value.(string)
-		re, err := regexp.Compile(pat)
-		if err != nil {
+		// Validate now (bad corpus ⇒ hard load error, unchanged contract) but
+		// drop the program: the closure compiles on demand via the shared LRU.
+		if _, err := regexp.Compile(pat); err != nil {
 			return nil, false, 0, fmt.Errorf("regex %q: %w", pat, err)
 		}
+		field, xform := s.Field, s.Transform
 		return func(e Evidence, _ evidenceIndex) bool {
-			return re.MatchString(fieldOfTransformed(e, s.Field, s.Transform))
+			if cache == nil {
+				return false // unreachable: LoadFromDir always provides a cache
+			}
+			re, err := cache.get(pat)
+			if err != nil {
+				return false
+			}
+			return re.MatchString(fieldOfTransformed(e, field, xform))
 		}, false, 0, nil
 	case "compound":
 		subs := make([]matcher, 0, len(s.And))
 		for _, c := range s.And {
-			m, _, _, err := compileMatchInner(c)
+			m, _, _, err := compileMatchInner(c, cache)
 			if err != nil {
 				return nil, false, 0, err
 			}
@@ -468,7 +520,7 @@ func compileMatchInner(s matchSpec) (matcher, bool, int, error) {
 	case "or":
 		subs := make([]matcher, 0, len(s.Any))
 		for _, c := range s.Any {
-			m, _, _, err := compileMatchInner(c)
+			m, _, _, err := compileMatchInner(c, cache)
 			if err != nil {
 				return nil, false, 0, err
 			}
