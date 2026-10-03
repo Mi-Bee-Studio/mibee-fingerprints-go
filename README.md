@@ -50,10 +50,38 @@ type ServiceIdentity struct {
 See the [MiBee Steward repo](https://github.com/Mi-Bee-Studio/MiBeeSteward) for
 the rule YAML files and `docs/fingerprint-spec.md` for the normative format spec.
 
+## Memory model: lazy regexes + literal gates
+
+A ~2600-rule corpus compiled eagerly costs ~50 MB of live Go heap (dominated
+by compiled RE2 programs) — too much for low-memory routers. The engine
+therefore compiles **lazily**:
+
+- **Load** validates every regex pattern (a malformed corpus still fails the
+  load) but keeps no compiled program resident.
+- Each rule gets a **gate**: a provably-required ASCII literal extracted from
+  its match tree (directly for `contains`/`equals`/`prefix`; from the
+  `regexp/syntax` AST for `regex` rules — concat ⇒ any mandatory literal,
+  alternation ⇒ common prefix of the branches' literals, fold-case ⇒ CI
+  gate, non-ASCII text is never gated). A rule whose gate literal is absent
+  from the evidence text is skipped before any regex is touched.
+- Patterns that pass gates compile on demand into a shared, mutex-protected
+  **LRU** (`RegexCacheSize`, default 512 ≈ a few MB worst case).
+
+Gates are conservative by construction: they may only skip a rule when the
+full matcher is *guaranteed* false. `TestGateEquivalenceOnFullCorpus`
+asserts byte-identical `Classify` output with gates on vs off across the
+whole corpus, and `TestGateNeverSkipsAMatch` fuzzes corpus patterns for
+soundness. Measured: full corpus load drops from ~50 MB to ~4 MB live heap
+with zero regexes compiled at startup.
+
+This also decouples corpus updates from binaries: rule YAMLs loaded via
+`LoadFromDir` (e.g. the agent's `scanner.fingerprint_path`) apply on restart
+without any recompile of center or agent.
+
 ## Testing
 
 ```bash
-go test ./...     # all tests including full 2554-rule corpus load
+go test ./...     # all tests including full-corpus load + gate soundness
 go test -race ./...
 ```
 
