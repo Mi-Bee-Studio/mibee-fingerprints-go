@@ -4,51 +4,83 @@ Reference Go engine for the MiBee fingerprint corpus.
 
 Loads YAML rule files and evaluates them against `Evidence` to emit
 `ServiceIdentity` assertions. Implements the adapter spec
-([fingerprint-spec.md](https://github.com/Mi-Bee-Studio/MiBeeSteward/blob/main/docs/fingerprint-spec.md)).
+([fingerprint-spec.md](https://github.com/Mi-Bee-Studio/MiBeeSteward/blob/main/docs/en/fingerprint-spec.md)).
 
 ## Usage
 
 ```go
-import fp "github.com/Mi-Bee-Studio/mibee-fingerprints-go"
+package main
 
-// Load embedded rules (compiled into the binary — zero config).
-rc := &fp.RuleClassifier{}
-if err := rc.LoadEmbeddedDefaults(); err != nil {
-    log.Fatal(err)
-}
+import (
+	"fmt"
+	"log"
+	"time"
 
-// Classify evidence.
-identities := rc.Classify(evidence)
-for _, id := range identities {
-    fmt.Printf("%s:%d → %s (conf=%.2f brand=%s)\n",
-        ip, id.Port, id.Service, id.Confidence, id.Metadata["inferred_brand"])
+	fp "github.com/Mi-Bee-Studio/mibee-fingerprints-go"
+)
+
+func main() {
+	rc := &fp.RuleClassifier{}
+	if err := rc.LoadEmbeddedDefaults(); err != nil {
+		log.Fatal(err)
+	}
+
+	// Classify the complete evidence slice collected for one host.
+	evidence := []fp.Evidence{
+		{
+			Source:     "active:tcp",
+			Kind:       "http",
+			IP:         "192.0.2.10",
+			Port:       8080,
+			Protocol:   "tcp",
+			RawData:    map[string]string{"server": "uhttpd/2023.12"},
+			Confidence: 0.9,
+			ObservedAt: time.Now(),
+		},
+	}
+	identities := rc.Classify(evidence)
+	for _, id := range identities {
+		fmt.Printf("%s:%d -> %s (conf=%.2f brand=%s)\n",
+			evidence[0].IP, id.Port, id.Service, id.Confidence, id.Metadata["inferred_brand"])
+	}
 }
 ```
+
+The runnable equivalent is in [`examples/quickstart/main.go`](examples/quickstart/main.go),
+covered by an example test.
 
 ## Types
 
 ```go
 type Evidence struct {
-    Kind       string            // "banner", "snmp", "http", "tls", ...
-    Port       int
-    RawData    map[string]string // protocol-specific payload
-    Confidence float64           // [0,1]
-    // ... (see fingerprint.go)
+	Source     string            // probe that produced the evidence (required)
+	Kind       string            // "banner", "snmp", "http", "tls", ...
+	IP         string            // target host (required)
+	Port       int               // 0 when not applicable
+	Protocol   string            // "tcp", "udp", or empty
+	RawData    map[string]string // protocol-specific payload
+	Confidence float64           // [0,1]
+	ObservedAt time.Time         // observation time (required)
 }
 
 type ServiceIdentity struct {
-    Service    string            // "ssh", "http", "camera", ...
-    Port       int
-    Confidence float64
-    Metadata   map[string]string // brand, version, os_type, ...
-    // ...
+	Service    string            // "ssh", "http", "camera", ...
+	Port       int
+	Protocol   string
+	Confidence float64
+	Evidence   []Evidence        // evidence backing this identity
+	Metadata   map[string]string // brand, version, os_type, ...
 }
 ```
+
+`Source`, `IP`, and `ObservedAt` must be populated when constructing evidence;
+port and protocol are optional depending on the observation.
 
 ## Rule format
 
 See the [MiBee Steward repo](https://github.com/Mi-Bee-Studio/MiBeeSteward) for
-the rule YAML files and `docs/fingerprint-spec.md` for the normative format spec.
+the rule YAML files and the [adapter specification](https://github.com/Mi-Bee-Studio/MiBeeSteward/blob/main/docs/en/fingerprint-spec.md)
+for the normative format.
 
 ## Memory model: lazy regexes + literal gates
 
@@ -99,8 +131,9 @@ Both layers are copyleft. Derivative Go code must be released under AGPLv3
 (or later), and derivative fingerprint corpora must be released under
 CC-BY-SA 4.0. A commercial license is available for source-code use cases the
 AGPLv3 does not accommodate (closed-source derivatives, SaaS without
-open-sourcing modifications) — see the main repository's
-[LICENSE-COMMERCIAL.md](https://github.com/Mi-Bee-Studio/MiBeeSteward/blob/main/LICENSE-COMMERCIAL.md).
+open-sourcing modifications). Contact Mi-Bee Studio using the details in
+[LICENSE-COMMERCIAL.md](https://github.com/Mi-Bee-Studio/MiBeeSteward/blob/main/LICENSE-COMMERCIAL.md)
+to discuss a commercial license.
 
 See [LICENSE](LICENSE) for the AGPLv3 full text and [NOTICE](NOTICE) for
 third-party attributions. The corpus provenance (Rapid7 Recog Apache-2.0,
